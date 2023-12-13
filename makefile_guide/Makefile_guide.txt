@@ -1,0 +1,99 @@
+# VERSION 1
+# hello为生成的可执行文件，依赖于后面的三个.cpp文件
+# g++前面加一个TAB的空格
+# 直接执行make命令，它会直接找Makefile文件，如果文件名不叫Makefile，可以通过make -f tempMakefile
+# 缺陷：如果cpp文件很多，就会写一长串，编译时间很长
+
+hello: main.cpp printhello.cpp factorial.cpp   #(代表hello的生成依赖于后面三个cpp)
+	g++ -o hello main.cpp printhello.cpp factorial.cpp
+
+
+#--------------------------------------------------------------------------------------------------------#
+# VERSION 2
+CXX = g++          #指定编译器
+TARGET = hello   #生成的可执行文件
+OBJ = main.o printhello.o factorial.o     #之前是通过g++ main.cpp -c 这种逐个文件的编译方式，生成main.o
+
+# make时执行g++ 先找TARGET，TARGET不存在找OBJ，OBJ不存在，编译三个.cpp文件生成.o文件
+# 然后再编译OBJ文件，生成可执行文件hello
+$(TARGET): $(OBJ)      #TARGET变量依赖于OBJ，如果OBJ有更新，则执行下一行语句
+	$(CXX) -o $(TARGET) $(OBJ)
+# main.o这样来的，编译main.cpp生成
+main.o: main.cpp
+	$(CXX) -c main.cpp
+printhello.o: printhello.cpp
+	$(CXX) -c printhello.cpp
+factorial.o: factorial.cpp
+	$(CXX) -c factorial.cpp
+
+# 总结: 当修改某一个cpp文件时，再进行make时，只会编译对应的cpp文件，即生成对应的.o文件，再与旧的.o文件进行链接
+
+#--------------------------------------------------------------------------------------------------------#
+
+# VERSION 3
+CXX = g++
+TARGET = hello
+OBJ = main.o printhello.o factorial.o                  #如果后面项目里加了一个新的cpp文件，直接在这一行加一个xxx.o
+ 
+# 编译选项，显示所有的warning
+CXXLAGS = -c -Wall
+ 
+# $@表示的就是冒号前面的TARGET，$^表示的是冒号后OBJ的全部.o依赖文件
+$(TARGET): $(OBJ)
+	$(CXX) -o $@ $^
+ 
+# $<表示指向%.cpp依赖的第一个，但是这里依赖只有一个
+# $(CXXLAGS)表示加上编译选项
+# $@表示指向%.o
+%.o: %.cpp                                                                        #其中 % 是通配符，用于匹配任意文件名，例如 foo.cpp 可以匹配到 foo.o
+	$(CXX) $(CXXLAGS) $< -o $@
+ 
+# 为了防止文件夹中存在一个文件叫clean，用于生成伪目标
+.PHONY: clean
+ 
+# -f表示强制删除，此处表示删除所有的.o文件和TARGET文件,执行的指令是 make clean
+clean:
+	rm -f *.o $(TARGET)
+
+# 总结：这个版本先执行 make clean，再执行 make
+
+
+#--------------------------------------------------------------------------------------------------------#
+
+
+# VERSION 4
+CXX = g++
+TARGET = hello
+# 所有当前目录的.cpp文件都放在SRC里面
+SRC = $(wildcard *.cpp)
+# patsubst把SRC里面的.cpp文件替换为.o文件
+OBJ = $(patsubst %.cpp, %.o,$(SRC))
+ 
+CXXLAGS = -c -Wall
+ 
+$(TARGET): $(OBJ)
+	$(CXX) -o $@ $^
+ 
+%.o: %.cpp
+	$(CXX) $(CXXLAGS) $< -o $@
+ 
+.PHONY: clean
+clean:
+	rm -f *.o $(TARGET)
+
+# 总结：如果项目里添加新的cpp文件，都用修改Makefile
+
+
+
+#--------------------------------------------------------------------------------------------------------#
+上述的Makefile依赖于操作系统，而cmake可实现跨平台
+
+cmake_minimum_required(VERSION 3.10)                           #cmake的最小支持版本
+ 
+project(hello)
+ 
+add_executable(hello main.cpp factorial.cpp printhello.cpp)    #生成hello可执行文件，同时依赖于后面三个cpp
+
+#直接调用cmake . ,就会自动寻找CMakeLists,还会生成Makefile
+#然后再执行make
+#不过一般新建build文件夹，在这个文件夹下面 cmake ..，然后make生成可执行文件
